@@ -1,28 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { getUsers, createUser, updateUser } from '../api/users';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
-  const [form, setForm] = useState({ name: '', email: '', role: 'employee', managerId: '' });
   const [editingUser, setEditingUser] = useState(null);
+  const [form, setForm] = useState({ name: '', email: '', role: 'employee', managerId: '' });
+
+  const fetchUsers = async () => {
+    const data = await getUsers();
+    setUsers(data);
+  };
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
-  const fetchUsers = async () => {
-    try {
-      const data = await getUsers();
-      setUsers(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSave = async e => {
-    e.preventDefault();
+  const handleSave = async () => {
     try {
       if (editingUser) await updateUser(editingUser._id, form);
       else await createUser(form);
@@ -31,52 +26,67 @@ const UserManagement = () => {
       fetchUsers();
     } catch (err) {
       console.error(err);
+      alert('Save failed!');
     }
   };
 
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">User Management</h1>
+  const handleEdit = user => {
+    setEditingUser(user);
+    setForm({ name: user.name, email: user.email, role: user.role, managerId: user.managerId || '' });
+  };
 
-      <form className="space-y-2 mb-6" onSubmit={handleSave}>
-        <input type="text" name="name" placeholder="Name" value={form.name} onChange={handleChange} className="p-2 border rounded w-full" required />
-        <input type="email" name="email" placeholder="Email" value={form.email} onChange={handleChange} className="p-2 border rounded w-full" required />
-        <select name="role" value={form.role} onChange={handleChange} className="p-2 border rounded w-full">
+  return (
+    <div>
+      <h1 className="text-3xl font-bold mb-6">User Management</h1>
+
+      {/* Form */}
+      <div className="bg-white p-6 rounded shadow mb-6 space-y-4">
+        <input name="name" value={form.name} onChange={handleChange} placeholder="Name" className="w-full p-2 border rounded" required />
+        <input name="email" value={form.email} onChange={handleChange} placeholder="Email" className="w-full p-2 border rounded" required />
+        <select name="role" value={form.role} onChange={handleChange} className="w-full p-2 border rounded">
           <option value="employee">Employee</option>
           <option value="manager">Manager</option>
           <option value="admin">Admin</option>
         </select>
-        <select name="managerId" value={form.managerId} onChange={handleChange} className="p-2 border rounded w-full">
-          <option value="">Assign Manager (optional)</option>
-          {users.filter(u => u.role === 'manager').map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
-        </select>
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save</button>
-      </form>
-
-      <table className="w-full border rounded">
-        <thead className="bg-gray-200">
-          <tr>
-            <th className="p-2">Name</th>
-            <th className="p-2">Email</th>
-            <th className="p-2">Role</th>
-            <th className="p-2">Manager</th>
-            <th className="p-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map(u => (
-            <tr key={u._id} className="border-t">
-              <td className="p-2">{u.name}</td>
-              <td className="p-2">{u.email}</td>
-              <td className="p-2">{u.role}</td>
-              <td className="p-2">{u.manager?.name || '-'}</td>
-              <td className="p-2">
-                <button onClick={() => { setEditingUser(u); setForm({ name: u.name, email: u.email, role: u.role, managerId: u.manager?._id || '' }); }} className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600">Edit</button>
-              </td>
-            </tr>
+        <select name="managerId" value={form.managerId} onChange={handleChange} className="w-full p-2 border rounded">
+          <option value="">Select Manager</option>
+          {users.filter(u => u.role === 'manager').map(u => (
+            <option key={u._id} value={u._id}>{u.name}</option>
           ))}
-        </tbody>
-      </table>
+        </select>
+        <button onClick={handleSave} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+          {editingUser ? 'Update User' : 'Add User'}
+        </button>
+      </div>
+
+      {/* Users Table */}
+      <div className="bg-white p-4 rounded shadow">
+        <h2 className="text-xl font-semibold mb-4">All Users</h2>
+        <table className="w-full table-auto border-collapse border">
+          <thead>
+            <tr className="bg-gray-200">
+              <th className="p-2 border">Name</th>
+              <th className="p-2 border">Email</th>
+              <th className="p-2 border">Role</th>
+              <th className="p-2 border">Manager</th>
+              <th className="p-2 border">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map(user => (
+              <tr key={user._id} className="border-t">
+                <td className="p-2 border">{user.name}</td>
+                <td className="p-2 border">{user.email}</td>
+                <td className="p-2 border">{user.role}</td>
+                <td className="p-2 border">{users.find(u => u._id === user.managerId)?.name || '-'}</td>
+                <td className="p-2 border">
+                  <button onClick={() => handleEdit(user)} className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">Edit</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

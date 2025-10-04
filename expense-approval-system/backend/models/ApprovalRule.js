@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 
-const ApprovalRuleSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  type: { type: String, enum: ['percentage','specific','hybrid'], required: true },
+const approvalRuleSchema = new mongoose.Schema({
+  name: String,
+  type: { type: String, enum: ['percentage','specific','hybrid'], default: 'percentage' },
   percentage: Number,
-  approvers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+  approvers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 });
 
-module.exports = mongoose.model('ApprovalRule', ApprovalRuleSchema);
+module.exports = mongoose.model('ApprovalRule', approvalRuleSchema);

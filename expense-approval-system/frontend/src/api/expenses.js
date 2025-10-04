@@ -1,13 +1,13 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:8000/api/expenses';
+const BASE_URL = 'http://localhost:8000/api';
 
-export const getExpenses = async () => {
-  const response = await axios.get(BASE_URL);
-  return response.data;
+export const submitExpense = async (expense) => {
+  const res = await axios.post(`${BASE_URL}/expenses`, expense);
+  return res.data;
 };
 
-export const submitExpense = async (data) => {
-  const response = await axios.post(BASE_URL, data);
-  return response.data;
+export const getExpenses = async () => {
+  const res = await axios.get(`${BASE_URL}/expenses`);
+  return res.data;
 };

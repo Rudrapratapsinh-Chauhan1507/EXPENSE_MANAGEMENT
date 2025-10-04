@@ -1,13 +1,13 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:8000/api/approval-rules';
+const BASE_URL = 'http://localhost:8000/api';
 
 export const getRules = async () => {
-  const response = await axios.get(BASE_URL);
-  return response.data;
+  const res = await axios.get(`${BASE_URL}/approval-rules`);
+  return res.data;
 };
 
-export const saveRule = async (data) => {
-  const response = await axios.post(BASE_URL, data);
-  return response.data;
+export const saveRule = async (rule) => {
+  const res = await axios.post(`${BASE_URL}/approval-rules`, rule);
+  return res.data;
 };

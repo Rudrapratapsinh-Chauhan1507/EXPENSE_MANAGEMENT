@@ -1,83 +1,47 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
-
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const Company = require('../models/Company');
 
-// -------- SIGNUP --------
+// SECRET for JWT (in production, store securely)
+const SECRET = 'supersecretkey';
+
+// Signup
 router.post('/signup', async (req, res) => {
   try {
-    const { companyName, currency, name, email } = req.body;
+    const { name, email, password } = req.body;
 
-    if (!companyName || !name || !email) {
-      return res.status(400).json({ message: 'All fields are required' });
-    }
+    // Check if first user -> auto-create Admin + Company (simplified)
+    const usersCount = await User.countDocuments();
+    let role = 'employee';
+    if (usersCount === 0) role = 'admin';
 
-    // Check if user already exists
-    let existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ message: 'User already exists' });
+    const user = new User({ name, email, password, role });
+    await user.save();
 
-    // Check if company exists
-    let company = await Company.findOne({ name: companyName });
-    if (!company) {
-      // First signup → create company
-      company = new Company({ name: companyName, currency: currency || 'USD' });
-      await company.save();
-    }
-
-    // Hash default password (or you can accept password from form)
-    const hashedPassword = await bcrypt.hash('admin123', 10);
-
-    // Create admin user
-    const newUser = new User({
-      name,
-      email,
-      password: hashedPassword,
-      role: 'admin',
-      company: company._id
-    });
-
-    await newUser.save();
-
-    return res.json({
-      _id: newUser._id,
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role,
-      company: { _id: company._id, name: company.name, currency: company.currency }
-    });
-
+    const token = jwt.sign({ id: user._id, role: user.role }, SECRET, { expiresIn: '1d' });
+    res.json({ user: { id: user._id, name: user.name, role: user.role }, token });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Signup failed', error: err.message });
+    res.status(400).json({ error: 'Signup failed' });
   }
 });
 
-// -------- LOGIN --------
+// Login
 router.post('/login', async (req, res) => {
   try {
-    const { email, name } = req.body;
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (!email || !name) return res.status(400).json({ message: 'Email and Name required' });
+    const valid = await user.comparePassword(password);
+    if (!valid) return res.status(401).json({ error: 'Invalid password' });
 
-    const user = await User.findOne({ email }).populate('company');
-    if (!user) return res.status(400).json({ message: 'User not found' });
-
-    // For demo, simple name check (replace with real password auth)
-    if (user.name !== name) return res.status(400).json({ message: 'Invalid credentials' });
-
-    return res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      company: { _id: user.company._id, name: user.company.name, currency: user.company.currency }
-    });
-
+    const token = jwt.sign({ id: user._id, role: user.role }, SECRET, { expiresIn: '1d' });
+    res.json({ user: { id: user._id, name: user.name, role: user.role }, token });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Login failed', error: err.message });
+    res.status(400).json({ error: 'Login failed' });
   }
 });
 

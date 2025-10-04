@@ -1,56 +1,40 @@
 const express = require('express');
 const router = express.Router();
 const Expense = require('../models/Expense');
-const User = require('../models/User');
 const ApprovalRule = require('../models/ApprovalRule');
+const User = require('../models/User');
 
-// Approve or reject an expense
-router.post('/:expenseId', async (req, res) => {
-  try {
-    const { action, approverId, comment } = req.body;
-    const expense = await Expense.findById(req.params.expenseId).populate('approvers.approver');
-
-    if (!expense) return res.status(404).json({ message: 'Expense not found' });
-
-    // Add approver record if not exists
-    let step = expense.approvers.findIndex(a => a.approver._id.toString() === approverId);
-    if (step === -1) {
-      expense.approvers.push({ approver: approverId, approved: action === 'approve', comment: comment || '' });
-    } else {
-      expense.approvers[step].approved = action === 'approve';
-      expense.approvers[step].comment = comment || '';
-    }
-
-    // Multi-step logic: move to next step
-    if (action === 'approve') {
-      expense.currentStep += 1;
-      if (expense.currentStep >= expense.approvers.length) expense.status = 'Approved';
-    } else {
-      expense.status = 'Rejected';
-    }
-
-    await expense.save();
-    const populatedExpense = await Expense.findById(expense._id).populate('employee', 'name').populate('approvers.approver', 'name');
-    res.json(populatedExpense);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error processing approval' });
-  }
+// Get pending approvals for logged-in user
+router.get('/pending', async (req, res) => {
+  const user = JSON.parse(req.query.user); // simulate user from frontend
+  const expenses = await Expense.find({ status: 'Pending' }).populate('employeeId', 'name');
+  const pending = expenses.filter(exp => {
+    // Simple logic: show if currentStep matches user's role
+    return exp.currentStep.toLowerCase() === user.role.toLowerCase();
+  }).map(e => ({
+    ...e._doc,
+    employeeName: e.employeeId.name
+  }));
+  res.json(pending);
 });
 
-// Get pending approvals for a user
-router.get('/pending/:userId', async (req, res) => {
-  try {
-    const userId = req.params.userId;
-    const expenses = await Expense.find({
-      'approvers.approver': userId,
-      status: 'Pending'
-    }).populate('employee', 'name email');
-    res.json(expenses);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error fetching pending approvals' });
-  }
+// Approve/Reject expense
+router.post('/:expenseId', async (req, res) => {
+  const { action, approver } = req.body;
+  const expense = await Expense.findById(req.params.expenseId);
+  if (!expense) return res.status(404).json({ error: 'Expense not found' });
+
+  // Add approval record
+  const approverUser = await User.findOne({ name: approver });
+  expense.approvals.push({ approverId: approverUser._id, action, date: new Date() });
+
+  // Multi-step logic
+  if (expense.currentStep === 'Manager') expense.currentStep = 'Finance';
+  else if (expense.currentStep === 'Finance') expense.currentStep = 'Director';
+  else expense.status = action === 'approve' ? 'Approved' : 'Rejected';
+
+  await expense.save();
+  res.json(expense);
 });
 
 module.exports = router;

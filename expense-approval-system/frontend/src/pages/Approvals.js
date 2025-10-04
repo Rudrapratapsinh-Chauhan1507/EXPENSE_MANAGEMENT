@@ -1,68 +1,114 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { getPendingApprovals, approveExpense, rejectExpense } from '../api/approvals';
+import { getRules } from '../api/rules';
 
 const Approvals = () => {
-  const [pending, setPending] = useState([]);
-  const userId = 'YOUR_USER_ID_HERE'; // replace with logged-in user id
+  const [expenses, setExpenses] = useState([]);
+  const [rules, setRules] = useState([]);
+
+  const fetchExpenses = async () => {
+    try {
+      const data = await getPendingApprovals();
+      setExpenses(data);
+    } catch (err) {
+      console.error('Error fetching approvals:', err);
+    }
+  };
+
+  const fetchRules = async () => {
+    try {
+      const data = await getRules();
+      setRules(data);
+    } catch (err) {
+      console.error('Error fetching rules:', err);
+    }
+  };
 
   useEffect(() => {
-    fetchPending();
+    fetchExpenses();
+    fetchRules();
   }, []);
 
-  const fetchPending = async () => {
-    try {
-      const data = await getPendingApprovals(userId);
-      setPending(data);
-    } catch (err) {
-      console.error(err);
-    }
+  const handleApprove = async (expenseId) => {
+    const approver = JSON.parse(localStorage.getItem('user')).name;
+    await approveExpense(expenseId, approver);
+    fetchExpenses();
   };
 
-  const handleApprove = async (id) => {
-    try {
-      await approveExpense(id, userId);
-      fetchPending();
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleReject = async (id) => {
-    try {
-      await rejectExpense(id, userId);
-      fetchPending();
-    } catch (err) {
-      console.error(err);
-    }
+  const handleReject = async (expenseId) => {
+    const approver = JSON.parse(localStorage.getItem('user')).name;
+    await rejectExpense(expenseId, approver);
+    fetchExpenses();
   };
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Pending Approvals</h1>
+    <div>
+      <h1 className="text-3xl font-bold mb-6">Approvals</h1>
 
-      <table className="w-full border rounded">
-        <thead className="bg-gray-200">
-          <tr>
-            <th className="p-2">Employee</th>
-            <th className="p-2">Amount</th>
-            <th className="p-2">Status</th>
-            <th className="p-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pending.map(exp => (
-            <tr key={exp._id} className="border-t">
-              <td className="p-2">{exp.employee?.name}</td>
-              <td className="p-2">{exp.amount}</td>
-              <td className="p-2">{exp.status}</td>
-              <td className="p-2 space-x-2">
-                <button onClick={() => handleApprove(exp._id)} className="bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">Approve</button>
-                <button onClick={() => handleReject(exp._id)} className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700">Reject</button>
-              </td>
+      <div className="bg-white p-4 rounded shadow">
+        <h2 className="text-xl font-semibold mb-4">Pending Expenses</h2>
+        <table className="w-full table-auto border-collapse border">
+          <thead>
+            <tr className="bg-gray-200">
+              <th className="p-2 border">Employee</th>
+              <th className="p-2 border">Amount</th>
+              <th className="p-2 border">Category</th>
+              <th className="p-2 border">Current Step</th>
+              <th className="p-2 border">Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {expenses.map(exp => (
+              <tr key={exp.id} className="border-t">
+                <td className="p-2 border">{exp.employeeName}</td>
+                <td className="p-2 border">{exp.amount} {exp.currency}</td>
+                <td className="p-2 border">{exp.category}</td>
+                <td className="p-2 border">{exp.currentStep || 'Manager'}</td>
+                <td className="p-2 border space-x-2">
+                  <button
+                    className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                    onClick={() => handleApprove(exp.id)}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+                    onClick={() => handleReject(exp.id)}
+                  >
+                    Reject
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-white p-4 rounded shadow mt-6">
+        <h2 className="text-xl font-semibold mb-4">Approval Rules</h2>
+        <table className="w-full table-auto border-collapse border">
+          <thead>
+            <tr className="bg-gray-200">
+              <th className="p-2 border">Rule Name</th>
+              <th className="p-2 border">Type</th>
+              <th className="p-2 border">Approvers / %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rules.map(rule => (
+              <tr key={rule.id} className="border-t">
+                <td className="p-2 border">{rule.name}</td>
+                <td className="p-2 border">{rule.type}</td>
+                <td className="p-2 border">
+                  {rule.type === 'percentage'
+                    ? `${rule.percentage}% of approvers`
+                    : rule.approvers.map(a => a.name).join(', ')}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

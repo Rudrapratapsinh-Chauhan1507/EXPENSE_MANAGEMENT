@@ -1,96 +1,88 @@
-import React, { useState, useEffect } from 'react';
-import { getRules, saveRule } from '../api/approvalRules';
+import React, { useEffect, useState } from 'react';
+import { getRules, saveRule } from '../api/rules';
 import { getUsers } from '../api/users';
 
 const ApprovalRules = () => {
   const [rules, setRules] = useState([]);
   const [users, setUsers] = useState([]);
-  const [form, setForm] = useState({ name: '', type: 'percentage', percentage: 0, approvers: [] });
+  const [form, setForm] = useState({ name: '', type: 'percentage', percentage: 50, approvers: [] });
+
+  const fetchRules = async () => setRules(await getRules());
+  const fetchUsers = async () => setUsers(await getUsers());
 
   useEffect(() => {
     fetchRules();
     fetchUsers();
   }, []);
 
-  const fetchRules = async () => {
-    try {
-      const data = await getRules();
-      setRules(data);
-    } catch (err) {
-      console.error(err);
-    }
+  const handleChange = e => {
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
   };
 
-  const fetchUsers = async () => {
-    try {
-      const data = await getUsers();
-      setUsers(data);
-    } catch (err) {
-      console.error(err);
-    }
+  const handleApproversChange = e => {
+    const options = e.target.options;
+    const selected = [];
+    for (let i = 0; i < options.length; i++) if (options[i].selected) selected.push(options[i].value);
+    setForm({ ...form, approvers: selected });
   };
 
-  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
-  const handleApprovers = e => {
-    const options = Array.from(e.target.selectedOptions, option => option.value);
-    setForm({ ...form, approvers: options });
-  };
-
-  const handleSave = async e => {
-    e.preventDefault();
+  const handleSave = async () => {
     try {
       await saveRule(form);
-      setForm({ name: '', type: 'percentage', percentage: 0, approvers: [] });
+      setForm({ name: '', type: 'percentage', percentage: 50, approvers: [] });
       fetchRules();
     } catch (err) {
       console.error(err);
+      alert('Save failed!');
     }
   };
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Approval Rules</h1>
+    <div>
+      <h1 className="text-3xl font-bold mb-6">Approval Rules</h1>
 
-      <form className="space-y-2 mb-6" onSubmit={handleSave}>
-        <input type="text" name="name" placeholder="Rule Name" value={form.name} onChange={handleChange} className="p-2 border rounded w-full" required />
-
-        <select name="type" value={form.type} onChange={handleChange} className="p-2 border rounded w-full">
-          <option value="percentage">Percentage Rule</option>
+      {/* Form */}
+      <div className="bg-white p-6 rounded shadow mb-6 space-y-4">
+        <input name="name" value={form.name} onChange={handleChange} placeholder="Rule Name" className="w-full p-2 border rounded" />
+        <select name="type" value={form.type} onChange={handleChange} className="w-full p-2 border rounded">
+          <option value="percentage">Percentage</option>
           <option value="specific">Specific Approver</option>
           <option value="hybrid">Hybrid</option>
         </select>
-
         {form.type === 'percentage' && (
-          <input type="number" name="percentage" placeholder="Percentage" value={form.percentage} onChange={handleChange} className="p-2 border rounded w-full" required />
+          <input type="number" name="percentage" value={form.percentage} onChange={handleChange} className="w-full p-2 border rounded" placeholder="Percentage" />
         )}
-
-        <select multiple value={form.approvers} onChange={handleApprovers} className="p-2 border rounded w-full">
+        <select multiple name="approvers" value={form.approvers} onChange={handleApproversChange} className="w-full p-2 border rounded">
           {users.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
         </select>
+        <button onClick={handleSave} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save Rule</button>
+      </div>
 
-        <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Rule</button>
-      </form>
-
-      <table className="w-full border rounded">
-        <thead className="bg-gray-200">
-          <tr>
-            <th className="p-2">Name</th>
-            <th className="p-2">Type</th>
-            <th className="p-2">Percentage</th>
-            <th className="p-2">Approvers</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rules.map(rule => (
-            <tr key={rule._id} className="border-t">
-              <td className="p-2">{rule.name}</td>
-              <td className="p-2">{rule.type}</td>
-              <td className="p-2">{rule.percentage || '-'}</td>
-              <td className="p-2">{rule.approvers.map(a => a.name).join(', ')}</td>
+      {/* Rules Table */}
+      <div className="bg-white p-4 rounded shadow">
+        <h2 className="text-xl font-semibold mb-4">All Rules</h2>
+        <table className="w-full table-auto border-collapse border">
+          <thead>
+            <tr className="bg-gray-200">
+              <th className="p-2 border">Name</th>
+              <th className="p-2 border">Type</th>
+              <th className="p-2 border">Percentage</th>
+              <th className="p-2 border">Approvers</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rules.map(rule => (
+              <tr key={rule._id} className="border-t">
+                <td className="p-2 border">{rule.name}</td>
+                <td className="p-2 border">{rule.type}</td>
+                <td className="p-2 border">{rule.percentage || '-'}</td>
+                <td className="p-2 border">{rule.approvers.map(a => a.name).join(', ')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
